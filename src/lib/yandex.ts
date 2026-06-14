@@ -82,7 +82,10 @@ export async function getCampaignOffers(
   let pageToken: string | undefined;
 
   do {
-    const body: Record<string, unknown> = { limit: 200 };
+    const body: Record<string, unknown> = {
+      limit: 200,
+      campaignIds: [campaignId],
+    };
     if (pageToken) body.page_token = pageToken;
 
     const data = await yandexRequest<{
