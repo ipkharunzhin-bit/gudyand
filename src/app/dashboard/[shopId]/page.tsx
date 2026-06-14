@@ -13,6 +13,7 @@ import {
   Search,
   Pencil,
   X,
+  Key,
 } from "lucide-react";
 
 interface ShopData {
@@ -39,6 +40,8 @@ export default function ShopProductsPage() {
   const [editApiKey, setEditApiKey] = useState("");
   const [editCampaignId, setEditCampaignId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [checkingKey, setCheckingKey] = useState(false);
+  const [keyResult, setKeyResult] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -77,6 +80,35 @@ export default function ShopProductsPage() {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCheckKey() {
+    setCheckingKey(true);
+    setKeyResult(null);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/yandex/validate?shop_id=${shopId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setKeyResult("❌ " + data.error);
+      } else {
+        setKeyResult(
+          `✅ Ключ валиден. Business ID в ключе: ${data.api_business_id}, в магазине: ${data.shop_business_id}` +
+            (data.match ? " (совпадают)" : " ⚠️ НЕ СОВПАДАЮТ!")
+        );
+      }
+    } catch (err) {
+      setKeyResult("❌ " + (err instanceof Error ? err.message : "Ошибка"));
+    } finally {
+      setCheckingKey(false);
     }
   }
 
@@ -302,6 +334,14 @@ export default function ShopProductsPage() {
             />
           </div>
           <button
+            onClick={handleCheckKey}
+            disabled={checkingKey}
+            className="btn-secondary whitespace-nowrap"
+          >
+            <Key className="mr-1 h-4 w-4" />
+            {checkingKey ? "Проверка..." : "Проверить ключ"}
+          </button>
+          <button
             onClick={handleLoadFromYandex}
             disabled={loadingProducts}
             className="btn-primary whitespace-nowrap"
@@ -310,6 +350,10 @@ export default function ShopProductsPage() {
             {loadingProducts ? "Загрузка..." : "Загрузить товары"}
           </button>
         </div>
+
+        {keyResult && (
+          <p className="mb-4 text-sm bg-blue-50 rounded-lg p-3">{keyResult}</p>
+        )}
 
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
