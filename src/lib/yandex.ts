@@ -78,27 +78,31 @@ export async function getCampaignOffers(
   businessId: number,
   campaignId: number
 ): Promise<YandexOffer[]> {
-  let allOffers: YandexOffer[] = [];
-  let pageToken: string | undefined;
+  // Для DBS-магазинов используем campaign-based эндпоинт
+  const allOffers: YandexOffer[] = [];
+  let page = 1;
+  const pageSize = 200;
 
-  do {
-    const body: Record<string, unknown> = {
-      limit: 200,
-      campaignIds: [campaignId],
-    };
-    if (pageToken) body.page_token = pageToken;
-
+  let hasMore = true;
+  while (hasMore) {
     const data = await yandexRequest<{
       offers: YandexOffer[];
-      paging?: { nextPageToken?: string };
-    }>(apiKey, `/v2/businesses/${businessId}/offers`, "POST", body);
+      paging?: { nextPageToken?: string; nextPage?: number };
+    }>(
+      apiKey,
+      `/campaigns/${campaignId}/offers?page=${page}&pageSize=${pageSize}&format=JSON`,
+      "GET"
+    );
 
-    allOffers = allOffers.concat(data.offers || []);
-    pageToken = data.paging?.nextPageToken;
-  } while (pageToken);
+    allOffers.push(...(data.offers || []));
 
-  // Фильтруем только товары этого campaignId
-  // В реальном API offer привязан к конкретному campaignId через offerMappings
+    if (data.paging?.nextPage) {
+      page = data.paging.nextPage;
+    } else {
+      hasMore = false;
+    }
+  }
+
   return allOffers;
 }
 
@@ -184,11 +188,23 @@ export async function updateStocks(
   );
 }
 
-// Проверить валидность API-ключа (получить информацию о токене)
+// Проверить валидность API-ключа
 export async function validateApiKey(apiKey: string) {
-  return yandexRequest<any>(
-    apiKey,
-    "/v2/auth/token",
-    "POST"
-  );
+  const url = `${YANDEX_API}/campaigns?page=1&pageSize=1`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Api-Key": apiKey,
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Yandex API error ${res.status}: ${errorText}`);
+  }
+
+  const data = await res.json();
+  // Возвращаем сырой ответ — интерфейс покажет, что внутри
+  return data;
 }
