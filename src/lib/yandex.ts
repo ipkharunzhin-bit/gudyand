@@ -206,6 +206,8 @@ export async function validateApiKey(apiKey: string) {
   }
 
   const data = await res.json();
-  // Возвращаем сырой ответ — интерфейс покажет, что внутри
-  return data;
+  // Извлекаем businessId из первой кампании
+  const campaigns = data.campaigns || [];
+  const businessId = campaigns[0]?.businessId ?? null;
+  return { businessId, campaigns, raw: data };
 }

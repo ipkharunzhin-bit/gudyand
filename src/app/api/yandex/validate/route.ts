@@ -28,11 +28,14 @@ export async function POST(request: NextRequest) {
     // Проверяем ключ через Яндекс API
     const result = await validateApiKey(shop.api_key);
 
+    const apiBusinessId = result.businessId ?? (result.campaigns?.[0]?.businessId ?? null);
+
     return NextResponse.json({
       success: true,
-      raw_response: result,
-      api_business_id: result.businessId ?? result.business_id ?? null,
+      api_business_id: apiBusinessId,
       shop_business_id: shop.business_id,
+      match: apiBusinessId === shop.business_id,
+      campaigns: result.campaigns || [],
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Ошибка проверки ключа";
