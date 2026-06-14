@@ -186,6 +186,6 @@ export async function validateApiKey(apiKey: string) {
   return yandexRequest<{ businessId: number }>(
     apiKey,
     "/v2/auth/token",
-    "GET"
+    "POST"
   );
 }
