@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      api_business_id: result.businessId,
+      raw_response: result,
+      api_business_id: result.businessId ?? result.business_id ?? null,
       shop_business_id: shop.business_id,
-      match: result.businessId === shop.business_id,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Ошибка проверки ключа";

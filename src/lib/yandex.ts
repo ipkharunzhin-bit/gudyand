@@ -183,7 +183,7 @@ export async function updateStocks(
 
 // Проверить валидность API-ключа (получить информацию о токене)
 export async function validateApiKey(apiKey: string) {
-  return yandexRequest<{ businessId: number }>(
+  return yandexRequest<any>(
     apiKey,
     "/v2/auth/token",
     "POST"
