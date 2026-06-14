@@ -90,8 +90,9 @@ export async function getCampaignOffers(
       paging?: { nextPageToken?: string; nextPage?: number };
     }>(
       apiKey,
-      `/campaigns/${campaignId}/offers?page=${page}&pageSize=${pageSize}&format=JSON`,
-      "GET"
+      `/campaigns/${campaignId}/offers`,
+      "POST",
+      { page, pageSize, format: "JSON" }
     );
 
     allOffers.push(...(data.offers || []));
