@@ -7,18 +7,6 @@ import { getOrders, deliverDigitalGoods, updateStocks } from "@/lib/yandex";
 
 export async function POST(request: NextRequest) {
   try {
-    // Проверка секретного ключа вебхука
-    const webhookSecret = process.env.WEBHOOK_SECRET;
-    if (webhookSecret) {
-      const headerSecret = request.headers.get("x-webhook-secret");
-      if (headerSecret !== webhookSecret) {
-        return NextResponse.json(
-          { error: "Invalid webhook secret" },
-          { status: 403 }
-        );
-      }
-    }
-
     const body = await request.json();
     const { event, type, order } = body;
 
