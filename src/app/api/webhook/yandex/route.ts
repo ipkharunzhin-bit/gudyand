@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { event, order } = body;
+    const { event, type, order } = body;
+
+    // Яндекс проверяет URL вебхука через PING — всегда отвечаем 200
+    if (type === "PING" || event === "PING") {
+      return NextResponse.json({ status: "ok" });
+    }
 
     // Интересуют только события изменения заказа
     if (
