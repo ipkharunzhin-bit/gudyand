@@ -11,7 +11,17 @@ import {
   ShoppingBag,
   BarChart3,
   Search,
+  Pencil,
+  X,
 } from "lucide-react";
+
+interface ShopData {
+  id: string;
+  name: string;
+  business_id: number;
+  api_key: string;
+  campaign_id: number;
+}
 
 export default function ShopProductsPage() {
   const { shopId } = useParams<{ shopId: string }>();
@@ -20,6 +30,15 @@ export default function ShopProductsPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [shopName, setShopName] = useState("");
+
+  // Edit shop state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBusinessId, setEditBusinessId] = useState("");
+  const [editApiKey, setEditApiKey] = useState("");
+  const [editCampaignId, setEditCampaignId] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -29,7 +48,21 @@ export default function ShopProductsPage() {
       return;
     }
     loadProducts(shopId);
+    loadShop(shopId);
   }, [shopId]);
+
+  async function loadShop(id: string) {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/shops/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShopName(data.shop?.name || "");
+      }
+    } catch {}
+  }
 
   async function loadProducts(id: string) {
     try {
@@ -61,12 +94,59 @@ export default function ShopProductsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      // Обновляем список товаров
       await loadProducts(shopId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setLoadingProducts(false);
+    }
+  }
+
+  async function openEdit() {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/shops/${shopId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      const shop: ShopData = data.shop;
+      setEditName(shop.name);
+      setEditBusinessId(String(shop.business_id));
+      setEditApiKey(shop.api_key);
+      setEditCampaignId(String(shop.campaign_id));
+      setEditOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка загрузки данных");
+    }
+  }
+
+  async function saveEdit() {
+    setEditSaving(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/shops/${shopId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editName,
+          business_id: parseInt(editBusinessId),
+          api_key: editApiKey,
+          campaign_id: parseInt(editCampaignId),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShopName(editName);
+      setEditOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -94,7 +174,16 @@ export default function ShopProductsPage() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <h1 className="text-lg font-bold">Товары</h1>
+            <h1 className="text-lg font-bold">
+              {shopName || "Магазин"}
+            </h1>
+            <button
+              onClick={openEdit}
+              className="text-gray-400 hover:text-black transition-colors p-1"
+              title="Редактировать магазин"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
           </div>
           <nav className="flex items-center gap-2">
             <Link
@@ -115,9 +204,90 @@ export default function ShopProductsPage() {
         </div>
       </header>
 
+      {/* Edit Modal */}
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Редактировать магазин</h2>
+              <button
+                onClick={() => setEditOpen(false)}
+                className="text-gray-400 hover:text-black"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Название
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Business ID
+                </label>
+                <input
+                  type="number"
+                  value={editBusinessId}
+                  onChange={(e) => setEditBusinessId(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  API Key
+                </label>
+                <input
+                  type="text"
+                  value={editApiKey}
+                  onChange={(e) => setEditApiKey(e.target.value)}
+                  className="input-field w-full"
+                  placeholder="Ваш партнёрский API-ключ"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Campaign ID
+                </label>
+                <input
+                  type="number"
+                  value={editCampaignId}
+                  onChange={(e) => setEditCampaignId(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditOpen(false)}
+                className="btn-secondary"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving}
+                className="btn-primary"
+              >
+                {editSaving ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-4xl px-6 py-8">
         {error && (
-          <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>
+          <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">
+            {error}
+          </p>
         )}
 
         <div className="card mb-6 flex flex-col sm:flex-row items-center gap-4">
@@ -166,7 +336,9 @@ export default function ShopProductsPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-500">
-                    {(product as unknown as Record<string, number>)._count_keys ?? 0} ключей
+                    {(product as unknown as Record<string, number>)._count_keys ??
+                      0}{" "}
+                    ключей
                   </span>
                   <span className="text-gray-300">→</span>
                 </div>
