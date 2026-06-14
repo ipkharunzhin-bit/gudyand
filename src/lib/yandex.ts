@@ -78,33 +78,32 @@ export async function getCampaignOffers(
   businessId: number,
   campaignId: number
 ): Promise<YandexOffer[]> {
-  // Для DBS-магазинов используем campaign-based эндпоинт
-  const allOffers: YandexOffer[] = [];
-  let page = 1;
-  const pageSize = 200;
+  const url = `${YANDEX_API}/campaigns/${campaignId}/offers`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
-  let hasMore = true;
-  while (hasMore) {
-    const data = await yandexRequest<{
-      offers: YandexOffer[];
-      paging?: { nextPageToken?: string; nextPage?: number };
-    }>(
-      apiKey,
-      `/campaigns/${campaignId}/offers`,
-      "POST",
-      { page, pageSize, format: "JSON" }
-    );
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Api-Key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ page: 1, pageSize: 200, format: "JSON" }),
+      signal: controller.signal,
+    });
 
-    allOffers.push(...(data.offers || []));
-
-    if (data.paging?.nextPage) {
-      page = data.paging.nextPage;
-    } else {
-      hasMore = false;
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Yandex API error ${res.status}: ${errorText}`);
     }
-  }
 
-  return allOffers;
+    const data = await res.json();
+    return data.offers || [];
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Получить заказы с фильтрацией по статусу
