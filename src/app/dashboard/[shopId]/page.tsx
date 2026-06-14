@@ -1,0 +1,180 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Product } from "@/types";
+import {
+  ArrowLeft,
+  Download,
+  Package,
+  ShoppingBag,
+  BarChart3,
+  Search,
+} from "lucide-react";
+
+export default function ShopProductsPage() {
+  const { shopId } = useParams<{ shopId: string }>();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    loadProducts(shopId);
+  }, [shopId]);
+
+  async function loadProducts(id: string) {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/products?shop_id=${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setProducts(data.products || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLoadFromYandex() {
+    setLoadingProducts(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/yandex/products?shop_id=${shopId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      // Обновляем список товаров
+      await loadProducts(shopId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setLoadingProducts(false);
+    }
+  }
+
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.offer_id.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-gray-500">Загрузка...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-gray-100">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/dashboard"
+              className="text-gray-400 hover:text-black transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+            <h1 className="text-lg font-bold">Товары</h1>
+          </div>
+          <nav className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/${shopId}/orders`}
+              className="btn-secondary text-xs"
+            >
+              <ShoppingBag className="mr-1 h-4 w-4" />
+              Заказы
+            </Link>
+            <Link
+              href={`/dashboard/${shopId}/stats`}
+              className="btn-secondary text-xs"
+            >
+              <BarChart3 className="mr-1 h-4 w-4" />
+              Статистика
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        {error && (
+          <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>
+        )}
+
+        <div className="card mb-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-field pl-10"
+              placeholder="Поиск по названию или offer_id..."
+            />
+          </div>
+          <button
+            onClick={handleLoadFromYandex}
+            disabled={loadingProducts}
+            className="btn-primary whitespace-nowrap"
+          >
+            <Download className="mr-1 h-4 w-4" />
+            {loadingProducts ? "Загрузка..." : "Загрузить товары"}
+          </button>
+        </div>
+
+        {filteredProducts.length === 0 ? (
+          <div className="text-center py-16">
+            <Package className="mx-auto h-12 w-12 text-gray-300" />
+            <p className="mt-4 text-sm text-gray-500">
+              {products.length === 0
+                ? "Нет товаров. Нажмите «Загрузить товары» для синхронизации с Яндекс Маркетом"
+                : "Ничего не найдено"}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredProducts.map((product) => (
+              <Link
+                key={product.id}
+                href={`/dashboard/${shopId}/products/${product.id}`}
+                className="card flex items-center justify-between hover:border-gray-300 transition-all"
+              >
+                <div>
+                  <h3 className="font-medium">{product.name}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    offer_id: {product.offer_id}
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">
+                    {(product as unknown as Record<string, number>)._count_keys ?? 0} ключей
+                  </span>
+                  <span className="text-gray-300">→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
