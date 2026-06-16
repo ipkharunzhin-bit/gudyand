@@ -4,17 +4,28 @@ import { deliverDigitalGoods, updateStocks } from "@/lib/yandex";
 
 const YANDEX_API = "https://api.partner.market.yandex.ru";
 
-// Получить заказ по ID напрямую (без фильтрации по статусу)
-async function getOrderById(apiKey: string, businessId: number, orderId: number) {
-  const res = await fetch(`${YANDEX_API}/v2/businesses/${businessId}/orders/${orderId}`, {
+// Получить заказ через search API (POST, без фильтрации)
+async function getOrderById(apiKey: string, businessId: number, orderId: number, campaignId: number) {
+  // Пробуем campaign-based эндпоинт (для DBS)
+  const res = await fetch(`${YANDEX_API}/campaigns/${campaignId}/orders/${orderId}`, {
     headers: { "Api-Key": apiKey, Accept: "application/json" },
   });
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Yandex API error ${res.status}: ${errorText}`);
+  if (res.ok) {
+    const data = await res.json();
+    if (data.order) return data.order;
   }
-  const data = await res.json();
-  return data.order || null;
+  // Fallback: ищем через поиск
+  const searchRes = await fetch(`${YANDEX_API}/businesses/${businessId}/orders`, {
+    method: "POST",
+    headers: { "Api-Key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ limit: 50, campaignIds: [campaignId] }),
+  });
+  if (searchRes.ok) {
+    const data = await searchRes.json();
+    const found = data.orders?.find((o: any) => String(o.id) === String(orderId));
+    if (found) return found;
+  }
+  return null;
 }
 
 export async function GET() {
@@ -68,8 +79,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "Already processed" });
     }
 
-    // Запрашиваем детали заказа по ID (без фильтрации по статусу)
-    const fullOrder = await getOrderById(shop.api_key, shop.business_id, Number(orderIdYM));
+    // Запрашиваем детали заказа
+    const fullOrder = await getOrderById(shop.api_key, shop.business_id, Number(orderIdYM), shop.campaign_id);
     if (!fullOrder || !fullOrder.items) {
       return NextResponse.json({ error: "Order not found in API" }, { status: 404 });
     }
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
     for (const yandexItem of fullOrder.items) {
       const offerId = yandexItem.offerId;
       const count = yandexItem.count || 1;
-      const itemId = yandexItem.id; // реальный ID из API
+      const itemId = yandexItem.id;
 
       const { data: product } = await supabaseAdmin
         .from("products")
@@ -115,7 +126,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "No keys available" });
     }
 
-    // Сначала доставляем в Яндекс
+    // Доставляем в Яндекс
     await deliverDigitalGoods(
       shop.api_key,
       shop.business_id,
@@ -124,7 +135,7 @@ export async function POST(request: NextRequest) {
       itemsToDeliver
     );
 
-    // Только после успешной доставки помечаем ключи
+    // Помечаем ключи
     await supabaseAdmin
       .from("keys")
       .update({ status: "sent", sent_at: new Date().toISOString() })
