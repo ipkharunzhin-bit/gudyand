@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { updateStocks } from "@/lib/yandex";
+import { deliverDigitalGoods, updateStocks } from "@/lib/yandex";
 
 const YANDEX_API = "https://api.partner.market.yandex.ru";
-
-// Доставка цифровых товаров с activateTill
-async function deliver(apiKey: string, campaignId: number, orderId: number, items: any[]) {
-  const res = await fetch(
-    `${YANDEX_API}/campaigns/${campaignId}/orders/${orderId}/deliverDigitalGoods`,
-    {
-      method: "POST",
-      headers: { "Api-Key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        items: items.map((i) => ({
-          id: i.id,
-          codes: i.codes,
-          slip: i.slip,
-          activateTill: i.activateTill,
-        })),
-      }),
-    }
-  );
-  if (!res.ok) throw new Error(`Yandex API error ${res.status}: ${await res.text()}`);
-  return res.json();
-}
 
 export async function GET() {
   return NextResponse.json({ status: "ok" });
@@ -44,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "ignored", notificationType });
     }
 
-    if (!orderId || !campaignId || !items || !Array.isArray(items)) {
+    if (!orderId || !campaignId) {
       return NextResponse.json({ error: "Missing order data" }, { status: 400 });
     }
 
@@ -65,13 +44,31 @@ export async function POST(request: NextRequest) {
 
     if (existing) return NextResponse.json({ status: "skipped", reason: "Already processed" });
 
+    // Получаем детали заказа для item.id
+    let orderItems: any[] = [];
+    try {
+      const res = await fetch(`${YANDEX_API}/campaigns/${campaignId}/orders/${orderId}`, {
+        headers: { "Api-Key": shop.api_key, Accept: "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.order?.items) orderItems = data.order.items;
+      }
+    } catch {}
+
+    // Если не получили через API — используем уведомление
+    if (orderItems.length === 0 && items && Array.isArray(items)) {
+      orderItems = items.map((i: any) => ({ offerId: i.offerId, count: i.count, id: 0 }));
+    }
+
     const itemsToDeliver: any[] = [];
     const keyIdsToMark: string[] = [];
     let totalKeys = 0;
 
-    for (const yandexItem of items) {
-      const offerId = yandexItem.offerId;
-      const count = yandexItem.count || 1;
+    for (const orderItem of orderItems) {
+      const offerId = orderItem.offerId;
+      const count = orderItem.count || 1;
+      const itemId = orderItem.id; // реальный ID из API
 
       const { data: product } = await supabaseAdmin
         .from("products")
@@ -91,12 +88,10 @@ export async function POST(request: NextRequest) {
 
       if (!availableKeys || availableKeys.length < count) continue;
 
-      const activateTill = new Date(Date.now() + 30 * 86400 * 1000).toISOString();
       itemsToDeliver.push({
-        id: yandexItem.id || 0,
+        id: itemId,
         codes: availableKeys.map((k) => k.code),
         slip: product.instruction || "",
-        activateTill,
       });
 
       keyIdsToMark.push(...availableKeys.map((k) => k.id));
@@ -107,7 +102,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "No keys available" });
     }
 
-    await deliver(shop.api_key, shop.campaign_id, Number(orderId), itemsToDeliver);
+    await deliverDigitalGoods(shop.api_key, shop.business_id, shop.campaign_id, Number(orderId), itemsToDeliver);
 
     await supabaseAdmin
       .from("keys")
