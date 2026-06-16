@@ -177,7 +177,7 @@ export async function deliverDigitalGoods(
         id: item.id,
         codes: item.codes,
         slip: item.slip || "",
-        activateTill: item.activate_till || item.activateTill || new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+        activateTill: item.activate_till || new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
       })),
     }
   );
