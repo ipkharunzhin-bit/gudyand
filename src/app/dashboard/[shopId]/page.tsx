@@ -13,7 +13,6 @@ import {
   Search,
   Pencil,
   X,
-  Key,
   Trash2,
 } from "lucide-react";
 
@@ -39,17 +38,12 @@ export default function ShopProductsPage() {
   const [editApiKey, setEditApiKey] = useState("");
   const [editCampaignId, setEditCampaignId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
-  const [checkingKey, setCheckingKey] = useState(false);
-  const [keyResult, setKeyResult] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
+    if (!token) { router.push("/login"); return; }
     loadProducts(shopId);
     loadShop(shopId);
   }, [shopId]);
@@ -57,42 +51,26 @@ export default function ShopProductsPage() {
   async function loadShop(id: string) {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/shops/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setShopName(data.shop?.name || "");
-      }
+      const res = await fetch(`/api/shops/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { const data = await res.json(); setShopName(data.shop?.name || ""); }
     } catch {}
   }
 
   async function loadProducts(id: string) {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products?shop_id=${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/products?shop_id=${id}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setProducts(data.products || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Ошибка"); } finally { setLoading(false); }
   }
 
   async function handleDeleteProduct(productId: string) {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/products?id=${productId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setProducts((prev) => prev.filter((p) => p.id !== productId));
-      }
+      const res = await fetch(`/api/products?id=${productId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setProducts((prev) => prev.filter((p) => p.id !== productId));
     } catch {}
   }
 
@@ -102,42 +80,10 @@ export default function ShopProductsPage() {
     try {
       const token = localStorage.getItem("token");
       for (const p of products) {
-        await fetch(`/api/products?id=${p.id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await fetch(`/api/products?id=${p.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       }
       setProducts([]);
-    } catch {
-    } finally {
-      setDeletingAll(false);
-    }
-  }
-
-  async function handleCheckKey() {
-    setCheckingKey(true);
-    setKeyResult(null);
-    setError("");
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`/api/yandex/validate?shop_id=${shopId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setKeyResult(
-        `✅ Ключ валиден. Business ID в ключе: ${data.api_business_id}, в магазине: ${data.shop_business_id}` +
-          (data.match ? " (совпадают)" : " ⚠️ НЕ СОВПАДАЮТ!")
-      );
-    } catch (err) {
-      setKeyResult("❌ " + (err instanceof Error ? err.message : "Ошибка"));
-    } finally {
-      setCheckingKey(false);
-    }
+    } catch {} finally { setDeletingAll(false); }
   }
 
   async function handleLoadFromYandex() {
@@ -147,27 +93,18 @@ export default function ShopProductsPage() {
       const token = localStorage.getItem("token");
       const res = await fetch(`/api/yandex/products?shop_id=${shopId}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       await loadProducts(shopId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка");
-    } finally {
-      setLoadingProducts(false);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Ошибка"); } finally { setLoadingProducts(false); }
   }
 
   async function openEdit() {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`/api/shops/${shopId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/shops/${shopId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       const shop: ShopData = data.shop;
@@ -176,9 +113,7 @@ export default function ShopProductsPage() {
       setEditApiKey(shop.api_key);
       setEditCampaignId(String(shop.campaign_id));
       setEditOpen(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка загрузки данных");
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Ошибка загрузки данных"); }
   }
 
   async function saveEdit() {
@@ -188,39 +123,22 @@ export default function ShopProductsPage() {
       const token = localStorage.getItem("token");
       const res = await fetch(`/api/shops/${shopId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: editName,
-          business_id: parseInt(editBusinessId),
-          api_key: editApiKey,
-          campaign_id: parseInt(editCampaignId),
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: editName, business_id: parseInt(editBusinessId), api_key: editApiKey, campaign_id: parseInt(editCampaignId) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setShopName(editName);
       setEditOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка сохранения");
-    } finally {
-      setEditSaving(false);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Ошибка сохранения"); } finally { setEditSaving(false); }
   }
 
   const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.offer_id.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()) || p.offer_id.toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-gray-500">Загрузка...</p>
-      </div>
-    );
+    return <div className="flex min-h-screen items-center justify-center"><p className="text-sm text-gray-500">Загрузка...</p></div>;
   }
 
   return (
@@ -228,21 +146,13 @@ export default function ShopProductsPage() {
       <header className="border-b border-gray-100">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-gray-400 hover:text-black transition-colors">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
+            <Link href="/dashboard" className="text-gray-400 hover:text-black transition-colors"><ArrowLeft className="h-5 w-5" /></Link>
             <h1 className="text-lg font-bold">{shopName || "Магазин"}</h1>
-            <button onClick={openEdit} className="text-gray-400 hover:text-black transition-colors p-1" title="Редактировать магазин">
-              <Pencil className="h-4 w-4" />
-            </button>
+            <button onClick={openEdit} className="text-gray-400 hover:text-black transition-colors p-1" title="Редактировать магазин"><Pencil className="h-4 w-4" /></button>
           </div>
           <nav className="flex items-center gap-2">
-            <Link href={`/dashboard/${shopId}/orders`} className="btn-secondary text-xs">
-              <ShoppingBag className="mr-1 h-4 w-4" />Заказы
-            </Link>
-            <Link href={`/dashboard/${shopId}/stats`} className="btn-secondary text-xs">
-              <BarChart3 className="mr-1 h-4 w-4" />Статистика
-            </Link>
+            <Link href={`/dashboard/${shopId}/orders`} className="btn-secondary text-xs"><ShoppingBag className="mr-1 h-4 w-4" />Заказы</Link>
+            <Link href={`/dashboard/${shopId}/stats`} className="btn-secondary text-xs"><BarChart3 className="mr-1 h-4 w-4" />Статистика</Link>
           </nav>
         </div>
       </header>
@@ -279,15 +189,10 @@ export default function ShopProductsPage() {
           <button onClick={handleDeleteAllProducts} disabled={deletingAll || products.length === 0} className="btn-danger whitespace-nowrap">
             <Trash2 className="mr-1 h-4 w-4" />{deletingAll ? "Удаление..." : "Удалить все"}
           </button>
-          <button onClick={handleCheckKey} disabled={checkingKey} className="btn-secondary whitespace-nowrap">
-            <Key className="mr-1 h-4 w-4" />{checkingKey ? "Проверка..." : "Проверить ключ"}
-          </button>
           <button onClick={handleLoadFromYandex} disabled={loadingProducts} className="btn-primary whitespace-nowrap">
             <Download className="mr-1 h-4 w-4" />{loadingProducts ? "Загрузка..." : "Загрузить товары"}
           </button>
         </div>
-
-        {keyResult && <p className="mb-4 text-sm bg-blue-50 rounded-lg p-3">{keyResult}</p>}
 
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
