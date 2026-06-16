@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getOrders, deliverDigitalGoods, updateStocks } from "@/lib/yandex";
+import { deliverDigitalGoods, updateStocks } from "@/lib/yandex";
+
+const YANDEX_API = "https://api.partner.market.yandex.ru";
+
+// Получить заказ по ID напрямую (без фильтрации по статусу)
+async function getOrderById(apiKey: string, businessId: number, orderId: number) {
+  const res = await fetch(`${YANDEX_API}/v2/businesses/${businessId}/orders/${orderId}`, {
+    headers: { "Api-Key": apiKey, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Yandex API error ${res.status}: ${errorText}`);
+  }
+  const data = await res.json();
+  return data.order || null;
+}
 
 export async function GET() {
   return NextResponse.json({ status: "ok" });
@@ -53,13 +68,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "Already processed" });
     }
 
-    // Запрашиваем детали заказа для получения реальных ID позиций
-    const ordersData = await getOrders(shop.api_key, shop.business_id, {
-      campaignIds: [shop.campaign_id],
-      limit: 10,
-    });
-
-    const fullOrder = ordersData.orders?.find((o: any) => String(o.id) === orderIdYM);
+    // Запрашиваем детали заказа по ID (без фильтрации по статусу)
+    const fullOrder = await getOrderById(shop.api_key, shop.business_id, Number(orderIdYM));
     if (!fullOrder || !fullOrder.items) {
       return NextResponse.json({ error: "Order not found in API" }, { status: 404 });
     }
