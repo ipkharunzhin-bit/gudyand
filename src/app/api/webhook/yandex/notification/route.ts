@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getOrders, deliverDigitalGoods, updateStocks } from "@/lib/yandex";
+import { deliverDigitalGoods, updateStocks } from "@/lib/yandex";
 
 export async function GET() {
   return NextResponse.json({ status: "ok" });
@@ -15,38 +15,25 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { event, type, notificationType, order } = body;
+    const { notificationType, orderId, campaignId, items, createdAt } = body;
 
-    // PING проверка — Яндекс требует поле name
-    if (type === "PING" || event === "PING" || notificationType === "PING") {
+    // PING проверка
+    if (notificationType === "PING") {
       return NextResponse.json({ status: "ok", name: "webhook", version: "1.0", time: new Date().toISOString() });
     }
 
-    if (
-      event !== "ORDER_STATUS_UPDATED" &&
-      event !== "ORDER_CREATED" &&
-      event !== "ORDER_STATUS_CHANGED"
-    ) {
-      return NextResponse.json({ status: "ignored", event });
+    // Обрабатываем только создание или изменение заказа
+    if (notificationType !== "ORDER_CREATED" && notificationType !== "ORDER_STATUS_UPDATED") {
+      return NextResponse.json({ status: "ignored", notificationType });
     }
 
-    if (!order) {
-      return NextResponse.json({ error: "No order data" }, { status: 400 });
+    if (!orderId || !campaignId || !items || !Array.isArray(items)) {
+      return NextResponse.json({ error: "Missing order data" }, { status: 400 });
     }
 
-    const orderIdYM = String(order.id);
-    const status = order.status;
-    const buyerEmail = order.buyer?.email || "";
+    const orderIdYM = String(orderId);
 
-    if (status !== "PROCESSING") {
-      return NextResponse.json({ status: "skipped", reason: `Order status is ${status}, not PROCESSING` });
-    }
-
-    const campaignId = order.campaignId;
-    if (!campaignId) {
-      return NextResponse.json({ error: "No campaignId" }, { status: 400 });
-    }
-
+    // Ищем магазин по campaignId
     const { data: shop } = await supabaseAdmin
       .from("shops")
       .select("*")
@@ -54,9 +41,10 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!shop) {
-      return NextResponse.json({ status: "skipped", reason: "Shop not found for campaign" });
+      return NextResponse.json({ status: "skipped", reason: "Shop not found for campaign " + campaignId });
     }
 
+    // Проверяем, не обработали ли уже этот заказ
     const { data: existingOrder } = await supabaseAdmin
       .from("orders")
       .select("id")
@@ -68,23 +56,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "Order already processed" });
     }
 
-    const ordersData = await getOrders(shop.api_key, shop.business_id, {
-      statuses: ["PROCESSING"],
-      campaignIds: [shop.campaign_id],
-      limit: 10,
-    });
-
-    const fullOrder = ordersData.orders?.find((o) => o.id === order.id);
-    if (!fullOrder) {
-      return NextResponse.json({ error: "Order not found in API" }, { status: 404 });
-    }
-
+    // Создаём запись заказа
     const { data: orderRecord } = await supabaseAdmin
       .from("orders")
       .insert({
         shop_id: shop.id,
         order_id_ym: orderIdYM,
-        buyer_email: buyerEmail,
+        buyer_email: "",
         total_keys: 0,
         status: "PROCESSING",
       })
@@ -98,10 +76,11 @@ export async function POST(request: NextRequest) {
     const itemsToDeliver: { id: number; codes: string[]; slip: string }[] = [];
     let totalKeys = 0;
 
-    for (const item of fullOrder.items) {
+    for (const item of items) {
       const offerId = item.offerId;
-      const count = item.count;
+      const count = item.count || 1;
 
+      // Находим товар в базе
       const { data: product } = await supabaseAdmin
         .from("products")
         .select("id, instruction")
@@ -111,6 +90,7 @@ export async function POST(request: NextRequest) {
 
       if (!product) continue;
 
+      // Берём нужное количество ключей
       const { data: availableKeys } = await supabaseAdmin
         .from("keys")
         .select("id, code")
@@ -123,12 +103,13 @@ export async function POST(request: NextRequest) {
       const codes = availableKeys.map((k) => k.code);
       const keyIds = availableKeys.map((k) => k.id);
 
+      // Помечаем как отправленные
       await supabaseAdmin
         .from("keys")
         .update({ status: "sent", sent_at: new Date().toISOString() })
         .in("id", keyIds);
 
-      itemsToDeliver.push({ id: item.id, codes, slip: product.instruction || "" });
+      itemsToDeliver.push({ id: item.id || 0, codes, slip: product.instruction || "" });
 
       for (const keyId of keyIds) {
         await supabaseAdmin.from("order_items").insert({
@@ -148,17 +129,24 @@ export async function POST(request: NextRequest) {
 
       if (remainingCount === 0) {
         await updateStocks(shop.api_key, shop.business_id, shop.campaign_id, offerId, 0)
-          .catch(() => {});
+          .catch((e) => console.error("Stocks update failed:", e));
       }
     }
 
+    // Обновляем total_keys
     await supabaseAdmin
       .from("orders")
       .update({ total_keys: totalKeys })
       .eq("id", orderRecord.id);
 
     if (itemsToDeliver.length > 0) {
-      await deliverDigitalGoods(shop.api_key, shop.business_id, shop.campaign_id, order.id, itemsToDeliver);
+      await deliverDigitalGoods(
+        shop.api_key,
+        shop.business_id,
+        shop.campaign_id,
+        orderId,
+        itemsToDeliver
+      );
     }
 
     return NextResponse.json({ status: "ok", delivered: itemsToDeliver.length, totalKeys });
