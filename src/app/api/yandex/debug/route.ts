@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(_request: NextRequest) {
   return NextResponse.json({
     deployed_at: new Date().toISOString(),
-    commit: "b328c39",
-    message: "Если видишь это сообщение — деплой свежий",
+    commit: "9ebe617",
+    message: "Новый деплой с таймаутом и фиксом offers",
   });
 }
