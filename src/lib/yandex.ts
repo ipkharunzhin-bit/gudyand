@@ -176,8 +176,8 @@ export async function deliverDigitalGoods(
       items: items.map((item) => ({
         id: item.id,
         codes: item.codes,
-        slip: item.slip,
-        activateTill: item.activate_till || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        slip: item.slip || "",
+        activateTill: item.activate_till || item.activateTill || new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
       })),
     }
   );
