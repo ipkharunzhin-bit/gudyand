@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
   try {
     const { event, type, notificationType, order } = body;
 
-    // PING проверка
+    // PING проверка — Яндекс требует поле name
     if (type === "PING" || event === "PING" || notificationType === "PING") {
-      return NextResponse.json({ status: "ok" });
+      return NextResponse.json({ status: "ok", name: "webhook" });
     }
 
     if (
