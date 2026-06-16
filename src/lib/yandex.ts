@@ -189,12 +189,12 @@ export async function updateStocks(
     {
       skus: [
         {
-          offerId,
-          warehouseId: 0, // основной склад
+          sku: offerId,
+          warehouseId: 0,
           items: [
             {
               type: "FIT",
-              count: stock > 0 ? stock : 0,
+              count: stock > 0 ? "1" : "0",
               updatedAt: new Date().toISOString(),
             },
           ],
