@@ -14,6 +14,7 @@ import {
   Pencil,
   X,
   Key,
+  Trash2,
 } from "lucide-react";
 
 interface ShopData {
@@ -42,6 +43,7 @@ export default function ShopProductsPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [checkingKey, setCheckingKey] = useState(false);
   const [keyResult, setKeyResult] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -80,6 +82,37 @@ export default function ShopProductsPage() {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDeleteProduct(productId: string) {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/products?id=${productId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+      }
+    } catch {}
+  }
+
+  async function handleDeleteAllProducts() {
+    if (!confirm("Удалить ВСЕ товары магазина?")) return;
+    setDeletingAll(true);
+    try {
+      const token = localStorage.getItem("token");
+      for (const p of products) {
+        await fetch(`/api/products?id=${p.id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      setProducts([]);
+    } catch {
+    } finally {
+      setDeletingAll(false);
     }
   }
 
@@ -334,6 +367,14 @@ export default function ShopProductsPage() {
             />
           </div>
           <button
+            onClick={handleDeleteAllProducts}
+            disabled={deletingAll || products.length === 0}
+            className="btn-danger whitespace-nowrap"
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            {deletingAll ? "Удаление..." : "Удалить все"}
+          </button>
+          <button
             onClick={handleCheckKey}
             disabled={checkingKey}
             className="btn-secondary whitespace-nowrap"
@@ -367,26 +408,40 @@ export default function ShopProductsPage() {
         ) : (
           <div className="space-y-2">
             {filteredProducts.map((product) => (
-              <Link
+              <div
                 key={product.id}
-                href={`/dashboard/${shopId}/products/${product.id}`}
-                className="card flex items-center justify-between hover:border-gray-300 transition-all"
+                className="card flex items-center justify-between hover:border-gray-300 transition-all group"
               >
-                <div>
-                  <h3 className="font-medium">{product.name}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    offer_id: {product.offer_id}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-500">
-                    {(product as unknown as Record<string, number>)._count_keys ??
-                      0}{" "}
-                    ключей
-                  </span>
-                  <span className="text-gray-300">→</span>
-                </div>
-              </Link>
+                <Link
+                  href={`/dashboard/${shopId}/products/${product.id}`}
+                  className="flex-1 flex items-center justify-between"
+                >
+                  <div>
+                    <h3 className="font-medium">{product.name}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      offer_id: {product.offer_id}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-500">
+                      {(product as unknown as Record<string, number>)._count_keys ??
+                        0}{" "}
+                      ключей
+                    </span>
+                    <span className="text-gray-300">→</span>
+                  </div>
+                </Link>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDeleteProduct(product.id);
+                  }}
+                  className="ml-4 p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Удалить товар"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </div>
         )}
