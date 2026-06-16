@@ -42,7 +42,6 @@ export default function ShopProductsPage() {
   const [checkingKey, setCheckingKey] = useState(false);
   const [keyResult, setKeyResult] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -82,18 +81,6 @@ export default function ShopProductsPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleRenameProduct(productId: string, newName: string) {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, name: newName } : p))
-    );
-    const token = localStorage.getItem("token");
-    await fetch("/api/products", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ id: productId, name: newName }),
-    }).catch(() => {});
   }
 
   async function handleDeleteProduct(productId: string) {
@@ -313,48 +300,16 @@ export default function ShopProductsPage() {
           <div className="space-y-2">
             {filteredProducts.map((product) => (
               <div key={product.id} className="card flex items-center justify-between hover:border-gray-300 transition-all group">
-                <Link href={`/dashboard/${shopId}/products/${product.id}`} className="flex-1 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      {editingProductId === product.id ? (
-                        <input
-                          type="text"
-                          defaultValue={product.name}
-                          className="input-field text-sm py-0.5 px-2"
-                          autoFocus
-                          onBlur={(e) => {
-                            const newName = e.target.value.trim();
-                            setEditingProductId(null);
-                            if (newName && newName !== product.name) {
-                              handleRenameProduct(product.id, newName);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                            if (e.key === "Escape") setEditingProductId(null);
-                          }}
-                          onClick={(e) => e.preventDefault()}
-                        />
-                      ) : (
-                        <h3 className="font-medium">{product.name}</h3>
-                      )}
-                      <button
-                        onClick={(e) => { e.preventDefault(); setEditingProductId(product.id); }}
-                        className="text-gray-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Переименовать"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">offer_id: {product.offer_id}</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-500">
-                      {(product as unknown as Record<string, number>)._count_keys ?? 0} ключей
-                    </span>
-                    <span className="text-gray-300">→</span>
-                  </div>
+                <Link href={`/dashboard/${shopId}/products/${product.id}`} className="flex-1 min-w-0">
+                  <h3 className="font-medium truncate">{product.name}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">offer_id: {product.offer_id}</p>
                 </Link>
+                <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                  <span className="text-sm text-gray-500 whitespace-nowrap">
+                    {(product as unknown as Record<string, number>)._count_keys ?? 0} ключей
+                  </span>
+                  <span className="text-gray-300">→</span>
+                </div>
                 <button
                   onClick={(e) => { e.preventDefault(); handleDeleteProduct(product.id); }}
                   className="ml-4 p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"

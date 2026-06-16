@@ -37,6 +37,12 @@ export async function POST(request: NextRequest) {
     let skipped = 0;
 
     for (const offer of offers) {
+      // Пропускаем архивные товары
+      if ((offer as any).status === "ARCHIVED") {
+        skipped++;
+        continue;
+      }
+
       // Проверяем, есть ли уже такой товар
       const { data: existing } = await supabaseAdmin
         .from("products")
