@@ -76,8 +76,11 @@ export async function getCampaigns(apiKey: string, businessId: number) {
 // Получить названия товаров через offer-mappings
 async function getOfferMappings(apiKey: string, businessId: number, campaignId: number): Promise<Map<string, string>> {
   const map = new Map<string, string>();
-  const url = `${YANDEX_API}/businesses/${businessId}/offer-mappings?page_token=&limit=200&campaignIds=${campaignId}`;
-  const res = await fetch(url, { headers: { "Api-Key": apiKey, Accept: "application/json" } });
+  const res = await fetch(`${YANDEX_API}/businesses/${businessId}/offer-mappings`, {
+    method: "POST",
+    headers: { "Api-Key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ limit: 200, campaignIds: [campaignId] }),
+  });
   if (!res.ok) return map;
   const data = await res.json();
   const offerMappings = data.result?.offerMappings || [];
@@ -194,7 +197,7 @@ export async function updateStocks(
           items: [
             {
               type: "FIT",
-              count: stock > 0 ? "1" : "0",
+              count: stock,
               updatedAt: new Date().toISOString(),
             },
           ],
