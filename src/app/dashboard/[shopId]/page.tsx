@@ -85,6 +85,23 @@ export default function ShopProductsPage() {
     }
   }
 
+  async function handleRenameProduct(productId: string, newName: string) {
+    try {
+      const token = localStorage.getItem("token");
+      await fetch("/api/products", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: productId, name: newName }),
+      });
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, name: newName } : p))
+      );
+    } catch {}
+  }
+
   async function handleDeleteProduct(productId: string) {
     try {
       const token = localStorage.getItem("token");

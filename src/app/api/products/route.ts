@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const userId = getUserIdFromRequest(request);
-    const { id, instruction } = await request.json();
+    const { id, instruction, name } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -123,9 +123,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const updates: Record<string, string> = {};
+    if (instruction !== undefined) updates.instruction = instruction;
+    if (name !== undefined) updates.name = name;
+
     const { error } = await supabaseAdmin
       .from("products")
-      .update({ instruction })
+      .update(updates)
       .eq("id", id);
 
     if (error) {
