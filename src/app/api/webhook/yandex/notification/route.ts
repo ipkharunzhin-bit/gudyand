@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
         id: itemId,
         codes: availableKeys.map((k) => k.code),
         slip: product.instruction || "",
+        activateTill: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
       });
 
       keyIdsToMark.push(...availableKeys.map((k) => k.id));
