@@ -33,8 +33,6 @@ export default function ShopProductsPage() {
   const [search, setSearch] = useState("");
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [shopName, setShopName] = useState("");
-
-  // Edit shop state
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editBusinessId, setEditBusinessId] = useState("");
@@ -44,6 +42,7 @@ export default function ShopProductsPage() {
   const [checkingKey, setCheckingKey] = useState(false);
   const [keyResult, setKeyResult] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -86,20 +85,15 @@ export default function ShopProductsPage() {
   }
 
   async function handleRenameProduct(productId: string, newName: string) {
-    try {
-      const token = localStorage.getItem("token");
-      await fetch("/api/products", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ id: productId, name: newName }),
-      });
-      setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, name: newName } : p))
-      );
-    } catch {}
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, name: newName } : p))
+    );
+    const token = localStorage.getItem("token");
+    await fetch("/api/products", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id: productId, name: newName }),
+    }).catch(() => {});
   }
 
   async function handleDeleteProduct(productId: string) {
@@ -147,14 +141,11 @@ export default function ShopProductsPage() {
         },
       });
       const data = await res.json();
-      if (!res.ok) {
-        setKeyResult("❌ " + data.error);
-      } else {
-        setKeyResult(
-          `✅ Ключ валиден. Business ID в ключе: ${data.api_business_id}, в магазине: ${data.shop_business_id}` +
-            (data.match ? " (совпадают)" : " ⚠️ НЕ СОВПАДАЮТ!")
-        );
-      }
+      if (!res.ok) throw new Error(data.error);
+      setKeyResult(
+        `✅ Ключ валиден. Business ID в ключе: ${data.api_business_id}, в магазине: ${data.shop_business_id}` +
+          (data.match ? " (совпадают)" : " ⚠️ НЕ СОВПАДАЮТ!")
+      );
     } catch (err) {
       setKeyResult("❌ " + (err instanceof Error ? err.message : "Ошибка"));
     } finally {
@@ -250,209 +241,115 @@ export default function ShopProductsPage() {
       <header className="border-b border-gray-100">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <Link
-              href="/dashboard"
-              className="text-gray-400 hover:text-black transition-colors"
-            >
+            <Link href="/dashboard" className="text-gray-400 hover:text-black transition-colors">
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <h1 className="text-lg font-bold">
-              {shopName || "Магазин"}
-            </h1>
-            <button
-              onClick={openEdit}
-              className="text-gray-400 hover:text-black transition-colors p-1"
-              title="Редактировать магазин"
-            >
+            <h1 className="text-lg font-bold">{shopName || "Магазин"}</h1>
+            <button onClick={openEdit} className="text-gray-400 hover:text-black transition-colors p-1" title="Редактировать магазин">
               <Pencil className="h-4 w-4" />
             </button>
           </div>
           <nav className="flex items-center gap-2">
-            <Link
-              href={`/dashboard/${shopId}/orders`}
-              className="btn-secondary text-xs"
-            >
-              <ShoppingBag className="mr-1 h-4 w-4" />
-              Заказы
+            <Link href={`/dashboard/${shopId}/orders`} className="btn-secondary text-xs">
+              <ShoppingBag className="mr-1 h-4 w-4" />Заказы
             </Link>
-            <Link
-              href={`/dashboard/${shopId}/stats`}
-              className="btn-secondary text-xs"
-            >
-              <BarChart3 className="mr-1 h-4 w-4" />
-              Статистика
+            <Link href={`/dashboard/${shopId}/stats`} className="btn-secondary text-xs">
+              <BarChart3 className="mr-1 h-4 w-4" />Статистика
             </Link>
           </nav>
         </div>
       </header>
 
-      {/* Edit Modal */}
       {editOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold">Редактировать магазин</h2>
-              <button
-                onClick={() => setEditOpen(false)}
-                className="text-gray-400 hover:text-black"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <button onClick={() => setEditOpen(false)} className="text-gray-400 hover:text-black"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Название
-                </label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Business ID
-                </label>
-                <input
-                  type="number"
-                  value={editBusinessId}
-                  onChange={(e) => setEditBusinessId(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  API Key
-                </label>
-                <input
-                  type="text"
-                  value={editApiKey}
-                  onChange={(e) => setEditApiKey(e.target.value)}
-                  className="input-field w-full"
-                  placeholder="Ваш партнёрский API-ключ"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Campaign ID
-                </label>
-                <input
-                  type="number"
-                  value={editCampaignId}
-                  onChange={(e) => setEditCampaignId(e.target.value)}
-                  className="input-field w-full"
-                />
-              </div>
+              <div><label className="block text-sm font-medium mb-1">Название</label><input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="input-field w-full" /></div>
+              <div><label className="block text-sm font-medium mb-1">Business ID</label><input type="number" value={editBusinessId} onChange={(e) => setEditBusinessId(e.target.value)} className="input-field w-full" /></div>
+              <div><label className="block text-sm font-medium mb-1">API Key</label><input type="text" value={editApiKey} onChange={(e) => setEditApiKey(e.target.value)} className="input-field w-full" placeholder="Ваш партнёрский API-ключ" /></div>
+              <div><label className="block text-sm font-medium mb-1">Campaign ID</label><input type="number" value={editCampaignId} onChange={(e) => setEditCampaignId(e.target.value)} className="input-field w-full" /></div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setEditOpen(false)}
-                className="btn-secondary"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={saveEdit}
-                disabled={editSaving}
-                className="btn-primary"
-              >
-                {editSaving ? "Сохранение..." : "Сохранить"}
-              </button>
+              <button onClick={() => setEditOpen(false)} className="btn-secondary">Отмена</button>
+              <button onClick={saveEdit} disabled={editSaving} className="btn-primary">{editSaving ? "Сохранение..." : "Сохранить"}</button>
             </div>
           </div>
         </div>
       )}
 
       <div className="mx-auto max-w-4xl px-6 py-8">
-        {error && (
-          <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">
-            {error}
-          </p>
-        )}
+        {error && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
 
         <div className="card mb-6 flex flex-col sm:flex-row items-center gap-4">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input-field pl-10"
-              placeholder="Поиск по названию или offer_id..."
-            />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-10" placeholder="Поиск по названию или offer_id..." />
           </div>
-          <button
-            onClick={handleDeleteAllProducts}
-            disabled={deletingAll || products.length === 0}
-            className="btn-danger whitespace-nowrap"
-          >
-            <Trash2 className="mr-1 h-4 w-4" />
-            {deletingAll ? "Удаление..." : "Удалить все"}
+          <button onClick={handleDeleteAllProducts} disabled={deletingAll || products.length === 0} className="btn-danger whitespace-nowrap">
+            <Trash2 className="mr-1 h-4 w-4" />{deletingAll ? "Удаление..." : "Удалить все"}
           </button>
-          <button
-            onClick={handleCheckKey}
-            disabled={checkingKey}
-            className="btn-secondary whitespace-nowrap"
-          >
-            <Key className="mr-1 h-4 w-4" />
-            {checkingKey ? "Проверка..." : "Проверить ключ"}
+          <button onClick={handleCheckKey} disabled={checkingKey} className="btn-secondary whitespace-nowrap">
+            <Key className="mr-1 h-4 w-4" />{checkingKey ? "Проверка..." : "Проверить ключ"}
           </button>
-          <button
-            onClick={handleLoadFromYandex}
-            disabled={loadingProducts}
-            className="btn-primary whitespace-nowrap"
-          >
-            <Download className="mr-1 h-4 w-4" />
-            {loadingProducts ? "Загрузка..." : "Загрузить товары"}
+          <button onClick={handleLoadFromYandex} disabled={loadingProducts} className="btn-primary whitespace-nowrap">
+            <Download className="mr-1 h-4 w-4" />{loadingProducts ? "Загрузка..." : "Загрузить товары"}
           </button>
         </div>
 
-        {keyResult && (
-          <p className="mb-4 text-sm bg-blue-50 rounded-lg p-3">{keyResult}</p>
-        )}
+        {keyResult && <p className="mb-4 text-sm bg-blue-50 rounded-lg p-3">{keyResult}</p>}
 
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
             <Package className="mx-auto h-12 w-12 text-gray-300" />
             <p className="mt-4 text-sm text-gray-500">
-              {products.length === 0
-                ? "Нет товаров. Нажмите «Загрузить товары» для синхронизации с Яндекс Маркетом"
-                : "Ничего не найдено"}
+              {products.length === 0 ? "Нет товаров. Нажмите «Загрузить товары» для синхронизации с Яндекс Маркетом" : "Ничего не найдено"}
             </p>
           </div>
         ) : (
           <div className="space-y-2">
             {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="card flex items-center justify-between hover:border-gray-300 transition-all group"
-              >
-                <Link
-                  href={`/dashboard/${shopId}/products/${product.id}`}
-                  className="flex-1 flex items-center justify-between"
-                >
+              <div key={product.id} className="card flex items-center justify-between hover:border-gray-300 transition-all group">
+                <div className="flex-1 flex items-center justify-between">
                   <div>
-                    <h3 className="font-medium">{product.name}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      offer_id: {product.offer_id}
-                    </p>
+                    {editingProductId === product.id ? (
+                      <input
+                        type="text"
+                        defaultValue={product.name}
+                        className="input-field text-sm py-0.5 px-2"
+                        autoFocus
+                        onBlur={(e) => {
+                          const newName = e.target.value.trim();
+                          setEditingProductId(null);
+                          if (newName && newName !== product.name) {
+                            handleRenameProduct(product.id, newName);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          if (e.key === "Escape") setEditingProductId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <h3
+                        className="font-medium cursor-pointer hover:text-blue-600 transition-colors"
+                        onClick={(e) => { e.preventDefault(); setEditingProductId(product.id); }}
+                      >
+                        {product.name}
+                      </h3>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">offer_id: {product.offer_id}</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-500">
-                      {(product as unknown as Record<string, number>)._count_keys ??
-                        0}{" "}
-                      ключей
-                    </span>
-                    <span className="text-gray-300">→</span>
-                  </div>
-                </Link>
+                  <span className="text-sm text-gray-500">
+                    {(product as unknown as Record<string, number>)._count_keys ?? 0} ключей
+                  </span>
+                </div>
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleDeleteProduct(product.id);
-                  }}
+                  onClick={(e) => { e.preventDefault(); handleDeleteProduct(product.id); }}
                   className="ml-4 p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                   title="Удалить товар"
                 >

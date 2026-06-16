@@ -73,6 +73,21 @@ export async function getCampaigns(apiKey: string, businessId: number) {
   return data.campaigns || [];
 }
 
+// Получить названия товаров через offer-mappings
+async function getOfferMappings(apiKey: string, businessId: number, campaignId: number): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const url = `${YANDEX_API}/businesses/${businessId}/offer-mappings?page_token=&limit=200&campaignIds=${campaignId}`;
+  const res = await fetch(url, { headers: { "Api-Key": apiKey, Accept: "application/json" } });
+  if (!res.ok) return map;
+  const data = await res.json();
+  const offerMappings = data.result?.offerMappings || [];
+  for (const m of offerMappings) {
+    const name = m.offer?.name || m.mapping?.marketModelName || m.offer?.offerId || "";
+    if (m.offer?.offerId) map.set(m.offer.offerId, name);
+  }
+  return map;
+}
+
 // Получить активные товары (offerIds) из магазина
 export async function getCampaignOffers(
   apiKey: string,
@@ -84,24 +99,24 @@ export async function getCampaignOffers(
   const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Api-Key": apiKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ page: 1, pageSize: 200, format: "JSON" }),
-      signal: controller.signal,
-    });
+    const [offersRes, nameMap] = await Promise.all([
+      fetch(url, {
+        method: "POST",
+        headers: { "Api-Key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ page: 1, pageSize: 200, format: "JSON" }),
+        signal: controller.signal,
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`Yandex API error ${r.status}: ${await r.text()}`);
+        return r.json();
+      }),
+      getOfferMappings(apiKey, businessId, campaignId).catch(() => new Map()),
+    ]);
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Yandex API error ${res.status}: ${errorText}`);
+    const offers: YandexOffer[] = offersRes.result?.offers || offersRes.offers || [];
+    for (const o of offers) {
+      if (!o.name && nameMap.has(o.offerId)) o.name = nameMap.get(o.offerId)!;
     }
-
-    const data = await res.json();
-    return data.result?.offers || data.offers || [];
+    return offers;
   } finally {
     clearTimeout(timeout);
   }

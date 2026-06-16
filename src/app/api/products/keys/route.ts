@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getUserIdFromRequest } from "@/lib/jwt";
+import { updateStocks } from "@/lib/yandex";
 
 // Получить все ключи товара
 export async function GET(request: NextRequest) {
@@ -115,8 +116,6 @@ export async function POST(request: NextRequest) {
       .eq("status", "available");
 
     if (existingKeys && existingKeys.length > 0) {
-      // Если есть ключи — stock > 0
-      const { updateStocks } = await import("@/lib/yandex");
       try {
         await updateStocks(
           shop.api_key,
@@ -195,7 +194,6 @@ export async function DELETE(request: NextRequest) {
       .eq("status", "available");
 
     if (remainingCount === 0) {
-      const { updateStocks } = await import("@/lib/yandex");
       try {
         await updateStocks(
           shop.api_key,
