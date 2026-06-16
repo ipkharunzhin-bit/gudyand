@@ -100,7 +100,7 @@ export async function getCampaignOffers(
     }
 
     const data = await res.json();
-    return data.offers || [];
+    return data.result?.offers || data.offers || [];
   } finally {
     clearTimeout(timeout);
   }
