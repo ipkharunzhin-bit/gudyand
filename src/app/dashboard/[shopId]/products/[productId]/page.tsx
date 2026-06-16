@@ -277,25 +277,9 @@ export default function ProductKeysPage() {
 
         {/* Статистика ключей */}
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="card relative">
+          <div className="card">
             <p className="text-2xl font-bold">{availableKeys.length}</p>
             <p className="text-xs text-gray-400 mt-0.5">Доступно</p>
-            {availableKeys.length > 0 && (
-              <button
-                onClick={async () => {
-                  if (!confirm(`Удалить все ${availableKeys.length} доступных ключей?`)) return;
-                  const token = localStorage.getItem("token");
-                  for (const k of availableKeys) {
-                    await fetch(`/api/products/keys?key_id=${k.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-                  }
-                  setKeys((prev) => prev.filter((k) => k.status !== "available"));
-                }}
-                className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors"
-                title="Удалить все доступные ключи"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
           </div>
           <div className="card">
             <p className="text-2xl font-bold">{sentKeys.length}</p>
@@ -355,9 +339,24 @@ export default function ProductKeysPage() {
 
         {/* Список ключей */}
         <div className="card">
-          <h3 className="font-medium mb-3">
-            Все ключи ({keys.length})
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium">Все ключи ({keys.length})</h3>
+            {availableKeys.length > 0 && (
+              <button
+                onClick={async () => {
+                  if (!confirm(`Удалить все ${availableKeys.length} доступных ключей?`)) return;
+                  const token = localStorage.getItem("token");
+                  for (const k of availableKeys) {
+                    await fetch(`/api/products/keys?key_id=${k.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+                  }
+                  setKeys((prev) => prev.filter((k) => k.status !== "available"));
+                }}
+                className="btn-danger text-xs"
+              >
+                <Trash2 className="mr-1 h-3 w-3" />Удалить все доступные ({availableKeys.length})
+              </button>
+            )}
+          </div>
           <div className="max-h-[500px] overflow-y-auto space-y-1">
             {keys.map((key) => (
               <div
