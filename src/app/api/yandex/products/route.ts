@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         await supabaseAdmin.from("products").insert({
           shop_id: shopId,
           offer_id: offer.offerId,
-          name: offer.name || offer.offerId,
+          name: offer.name || offer.offerName || offer.offerId,
           instruction: "",
         });
         added++;

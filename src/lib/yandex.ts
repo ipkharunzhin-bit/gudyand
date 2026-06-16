@@ -5,9 +5,10 @@ const YANDEX_API = "https://api.partner.market.yandex.ru";
 
 interface YandexOffer {
   offerId: string;
-  name: string;
-  category: string;
-  price: {
+  name?: string;
+  offerName?: string;
+  category?: string;
+  price?: {
     value: number;
     currencyId: string;
   };
