@@ -115,18 +115,25 @@ export async function POST(request: NextRequest) {
       .eq("product_id", product_id)
       .eq("status", "available");
 
-    if (existingKeys && existingKeys.length > 0) {
-      try {
-        await updateStocks(
-          shop.api_key,
-          shop.business_id,
-          shop.campaign_id,
-          product.offer_id,
-          1
-        );
-      } catch {
-        // ignore stock update errors
-      }
+    // Считаем ВСЕ доступные ключи и отправляем сток = количество
+    const { count: totalAvailable } = await supabaseAdmin
+      .from("keys")
+      .select("*", { count: "exact", head: true })
+      .eq("product_id", product_id)
+      .eq("status", "available");
+
+    const stockCount = totalAvailable ?? 0;
+
+    try {
+      await updateStocks(
+        shop.api_key,
+        shop.business_id,
+        shop.campaign_id,
+        product.offer_id,
+        stockCount
+      );
+    } catch {
+      // ignore
     }
 
     return NextResponse.json({ added: rows.length });
