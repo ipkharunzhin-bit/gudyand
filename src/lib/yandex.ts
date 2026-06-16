@@ -168,12 +168,18 @@ export async function deliverDigitalGoods(
     activate_till?: string;
   }[]
 ) {
-  // Используем v2 endpoint для кампании
   await yandexRequest(
     apiKey,
     `/v2/campaigns/${campaignId}/orders/${orderId}/deliverDigitalGoods`,
     "POST",
-    { items }
+    {
+      items: items.map((item) => ({
+        id: item.id,
+        codes: item.codes,
+        slip: item.slip,
+        activateTill: item.activate_till || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })),
+    }
   );
 }
 
