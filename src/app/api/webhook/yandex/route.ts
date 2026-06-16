@@ -5,6 +5,11 @@ import { getOrders, deliverDigitalGoods, updateStocks } from "@/lib/yandex";
 // Принимает уведомления от Яндекс Маркета
 // Документация: https://yandex.ru/dev/market/partner-api/doc/ru/push-notifications/reference/sendNotification
 
+// Яндекс проверяет URL через GET — всегда отвечаем OK
+export async function GET() {
+  return NextResponse.json({ status: "ok" });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
