@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { deliverDigitalGoods, updateStocks } from "@/lib/yandex";
+import { updateStocks } from "@/lib/yandex";
 
 const YANDEX_API = "https://api.partner.market.yandex.ru";
 
-// Получить заказ через search API (POST, без фильтрации)
+// Получить заказ — сначала кампания, потом поиск по бизнесу
 async function getOrderById(apiKey: string, businessId: number, orderId: number, campaignId: number) {
-  // Пробуем campaign-based эндпоинт (для DBS)
   const res = await fetch(`${YANDEX_API}/campaigns/${campaignId}/orders/${orderId}`, {
     headers: { "Api-Key": apiKey, Accept: "application/json" },
   });
@@ -14,7 +13,6 @@ async function getOrderById(apiKey: string, businessId: number, orderId: number,
     const data = await res.json();
     if (data.order) return data.order;
   }
-  // Fallback: ищем через поиск
   const searchRes = await fetch(`${YANDEX_API}/businesses/${businessId}/orders`, {
     method: "POST",
     headers: { "Api-Key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
@@ -28,17 +26,34 @@ async function getOrderById(apiKey: string, businessId: number, orderId: number,
   return null;
 }
 
+// Доставка цифровых товаров с activateTill
+async function deliver(apiKey: string, campaignId: number, orderId: number, items: any[]) {
+  const res = await fetch(
+    `${YANDEX_API}/campaigns/${campaignId}/orders/${orderId}/deliverDigitalGoods`,
+    {
+      method: "POST",
+      headers: { "Api-Key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        items: items.map((i) => ({
+          id: i.id,
+          codes: i.codes,
+          slip: i.slip,
+          activateTill: i.activateTill || new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+        })),
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(`Yandex API error ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 export async function GET() {
   return NextResponse.json({ status: "ok" });
 }
 
 export async function POST(request: NextRequest) {
   let body: any;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ status: "ok" });
-  }
+  try { body = await request.json(); } catch { return NextResponse.json({ status: "ok" }); }
 
   try {
     const { notificationType, orderId, campaignId, items, createdAt } = body;
@@ -63,11 +78,8 @@ export async function POST(request: NextRequest) {
       .eq("campaign_id", campaignId)
       .single();
 
-    if (!shop) {
-      return NextResponse.json({ status: "skipped", reason: "Shop not found" });
-    }
+    if (!shop) return NextResponse.json({ status: "skipped", reason: "Shop not found" });
 
-    // Проверяем, не обработан ли заказ
     const { data: existing } = await supabaseAdmin
       .from("orders")
       .select("id")
@@ -75,17 +87,14 @@ export async function POST(request: NextRequest) {
       .eq("shop_id", shop.id)
       .single();
 
-    if (existing) {
-      return NextResponse.json({ status: "skipped", reason: "Already processed" });
-    }
+    if (existing) return NextResponse.json({ status: "skipped", reason: "Already processed" });
 
-    // Запрашиваем детали заказа
     const fullOrder = await getOrderById(shop.api_key, shop.business_id, Number(orderIdYM), shop.campaign_id);
     if (!fullOrder || !fullOrder.items) {
       return NextResponse.json({ error: "Order not found in API" }, { status: 404 });
     }
 
-    const itemsToDeliver: { id: number; codes: string[]; slip: string }[] = [];
+    const itemsToDeliver: any[] = [];
     const keyIdsToMark: string[] = [];
     let totalKeys = 0;
 
@@ -112,10 +121,12 @@ export async function POST(request: NextRequest) {
 
       if (!availableKeys || availableKeys.length < count) continue;
 
+      const activateTill = new Date(Date.now() + 30 * 86400 * 1000).toISOString();
       itemsToDeliver.push({
         id: itemId,
         codes: availableKeys.map((k) => k.code),
         slip: product.instruction || "",
+        activateTill,
       });
 
       keyIdsToMark.push(...availableKeys.map((k) => k.id));
@@ -126,22 +137,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "No keys available" });
     }
 
-    // Доставляем в Яндекс
-    await deliverDigitalGoods(
-      shop.api_key,
-      shop.business_id,
-      shop.campaign_id,
-      Number(orderIdYM),
-      itemsToDeliver
-    );
+    await deliver(shop.api_key, shop.campaign_id, Number(orderIdYM), itemsToDeliver);
 
-    // Помечаем ключи
     await supabaseAdmin
       .from("keys")
       .update({ status: "sent", sent_at: new Date().toISOString() })
       .in("id", keyIdsToMark);
 
-    // Создаём запись заказа
     await supabaseAdmin.from("orders").insert({
       shop_id: shop.id,
       order_id_ym: orderIdYM,
